@@ -401,15 +401,11 @@ impl<'a, 'id, T> CursorMut<'a, 'id, T> {
     }
 
     pub fn move_right(&mut self) -> bool {
-        self.inner
-            .move_mut(|node| node.right.as_deref())
-            .is_ok()
+        self.inner.move_mut(|node| node.right.as_deref()).is_ok()
     }
 
     pub fn move_left(&mut self) -> bool {
-        self.inner
-            .move_mut(|node| node.left.as_deref())
-            .is_ok()
+        self.inner.move_mut(|node| node.left.as_deref()).is_ok()
     }
 
     pub fn current(&mut self) -> Option<&mut T> {
@@ -429,15 +425,11 @@ impl<'a, 'id, T> CursorMut<'a, 'id, T> {
     }
 
     fn peek_right_node(&self) -> Option<&GhostNode<'id, T>> {
-        self.inner
-            .borrow()
-            .and_then(|node| node.right.as_deref())
+        self.inner.borrow().and_then(|node| node.right.as_deref())
     }
 
     fn peek_left_node(&self) -> Option<&GhostNode<'id, T>> {
-        self.inner
-            .borrow()
-            .and_then(|node| node.left.as_deref())
+        self.inner.borrow().and_then(|node| node.left.as_deref())
     }
 }
 
