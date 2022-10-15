@@ -1,0 +1,76 @@
+name: Check
+
+on: push
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-rust:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install clippy with stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: clippy, rustfmt, miri
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: Clippy Check
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-targets --all-features -- -D warnings
+          name: clippy
+
+      - name: Rustfmt Check
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: -- --check
+      
+      - name: Runs Tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+
+      - name: Run Tests With Miri
+        uses: actions-rs/cargo@v1
+        with:
+          command: miri
+          args: test
+
+      - name: Leak Sanitizer
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+        env:
+          RUSTFLAGS: "-Z sanitizer=leak"
+
+      - name: Thread Sanitizer
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+        env:
+          RUSTFLAGS: "-Z sanitizer=thread"
+      
+      - name: Address Sanitizer
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+        env:
+          RUSTFLAGS: "-Z sanitizer=address"
+
+      - name: Memory Sanitizer
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+        env:
+          RUSTFLAGS: "-Z sanitizer=memory"
