@@ -222,7 +222,7 @@ impl<'id, T> DLList<'id, T> {
     }
 
     pub fn clear(&mut self, token: &mut GhostToken<'id>) {
-        while let Some(_) = self.pop_back(token) {}
+        while self.pop_back(token).is_some() {}
     }
 
     fn new_halves(value: T) -> (HalfNodePtr<'id, T>, HalfNodePtr<'id, T>) {
@@ -365,11 +365,11 @@ impl<'a, 'id, T> Cursor<'a, 'id, T> {
     }
 
     fn peek_right_node(&self) -> Option<&'a GhostNode<'id, T>> {
-        self.node?.borrow(self.token).right.as_ref().map(|n| &**n)
+        self.node?.borrow(self.token).right.as_deref()
     }
 
     fn peek_left_node(&self) -> Option<&'a GhostNode<'id, T>> {
-        self.node?.borrow(self.token).left.as_ref().map(|n| &**n)
+        self.node?.borrow(self.token).left.as_deref()
     }
 }
 
@@ -402,13 +402,13 @@ impl<'a, 'id, T> CursorMut<'a, 'id, T> {
 
     pub fn move_right(&mut self) -> bool {
         self.inner
-            .move_mut(|node| node.right.as_ref().map(|n| &**n))
+            .move_mut(|node| node.right.as_deref())
             .is_ok()
     }
 
     pub fn move_left(&mut self) -> bool {
         self.inner
-            .move_mut(|node| node.left.as_ref().map(|n| &**n))
+            .move_mut(|node| node.left.as_deref())
             .is_ok()
     }
 
@@ -431,13 +431,13 @@ impl<'a, 'id, T> CursorMut<'a, 'id, T> {
     fn peek_right_node(&self) -> Option<&GhostNode<'id, T>> {
         self.inner
             .borrow()
-            .and_then(|node| node.right.as_ref().map(|n| &**n))
+            .and_then(|node| node.right.as_deref())
     }
 
     fn peek_left_node(&self) -> Option<&GhostNode<'id, T>> {
         self.inner
             .borrow()
-            .and_then(|node| node.left.as_ref().map(|n| &**n))
+            .and_then(|node| node.left.as_deref())
     }
 }
 
