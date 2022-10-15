@@ -3,18 +3,18 @@
 use ghost_cell::{GhostCell, GhostCursor, GhostToken};
 use static_rc::StaticRc;
 
-pub struct DLList<'id, T> {
+pub struct LinkedList<'id, T> {
     head_tail: Option<(HalfNodePtr<'id, T>, HalfNodePtr<'id, T>)>,
 }
 
-impl<'id, T> DLList<'id, T> {
+impl<'id, T> LinkedList<'id, T> {
     /// Creates an empty list.
     pub const fn new() -> Self {
         Self { head_tail: None }
     }
 
     pub fn from_iter<I: IntoIterator<Item = T>>(iter: I, token: &mut GhostToken<'id>) -> Self {
-        let mut list = DLList::new();
+        let mut list = LinkedList::new();
 
         for value in iter.into_iter() {
             list.push_back(value, token)
@@ -314,13 +314,13 @@ pub struct Cursor<'a, 'id, T> {
 }
 
 impl<'a, 'id, T> Cursor<'a, 'id, T> {
-    pub fn new_front(list: &'a DLList<'id, T>, token: &'a GhostToken<'id>) -> Self {
+    pub fn new_front(list: &'a LinkedList<'id, T>, token: &'a GhostToken<'id>) -> Self {
         let node = list.head_tail.as_ref().map(|head_tail| &*head_tail.0);
 
         Self { token, node }
     }
 
-    pub fn new_back(list: &'a DLList<'id, T>, token: &'a GhostToken<'id>) -> Self {
+    pub fn new_back(list: &'a LinkedList<'id, T>, token: &'a GhostToken<'id>) -> Self {
         let node = list.head_tail.as_ref().map(|head_tail| &*head_tail.1);
 
         Self { token, node }
@@ -378,7 +378,7 @@ pub struct CursorMut<'a, 'id, T> {
 }
 
 impl<'a, 'id, T> CursorMut<'a, 'id, T> {
-    pub fn new_front(list: &'a DLList<'id, T>, token: &'a mut GhostToken<'id>) -> Self {
+    pub fn new_front(list: &'a LinkedList<'id, T>, token: &'a mut GhostToken<'id>) -> Self {
         let node = list.head_tail.as_ref().map(|head_tail| &*head_tail.0);
 
         Self {
@@ -386,7 +386,7 @@ impl<'a, 'id, T> CursorMut<'a, 'id, T> {
         }
     }
 
-    pub fn new_back(list: &'a DLList<'id, T>, token: &'a mut GhostToken<'id>) -> Self {
+    pub fn new_back(list: &'a LinkedList<'id, T>, token: &'a mut GhostToken<'id>) -> Self {
         let node = list.head_tail.as_ref().map(|head_tail| &*head_tail.1);
 
         Self {
@@ -456,8 +456,8 @@ mod test {
     #[test]
     fn append() {
         GhostToken::new(|ref mut token| {
-            let mut list = DLList::from_iter([1, 2, 3], token);
-            let mut other = DLList::from_iter([4, 5, 6], token);
+            let mut list = LinkedList::from_iter([1, 2, 3], token);
+            let mut other = LinkedList::from_iter([4, 5, 6], token);
 
             list.append(&mut other, token);
 
@@ -481,8 +481,8 @@ mod test {
     #[test]
     fn prepend() {
         GhostToken::new(|ref mut token| {
-            let mut list = DLList::from_iter([1, 2, 3], token);
-            let mut other = DLList::from_iter([4, 5, 6], token);
+            let mut list = LinkedList::from_iter([1, 2, 3], token);
+            let mut other = LinkedList::from_iter([4, 5, 6], token);
 
             list.prepend(&mut other, token);
 
@@ -506,7 +506,7 @@ mod test {
     #[test]
     fn split_off() {
         GhostToken::new(|ref mut token| {
-            let mut list = DLList::from_iter([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], token);
+            let mut list = LinkedList::from_iter([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], token);
 
             let mut other = list.split_off(5, token).unwrap();
 

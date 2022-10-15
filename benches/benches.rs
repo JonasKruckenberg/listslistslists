@@ -9,7 +9,7 @@ struct Big([usize; 32]);
 
 fn push_back_crate_small(n: usize) {
     GhostToken::new(|ref mut token| {
-        let mut list = rope::DLList::new();
+        let mut list = linked_list::LinkedList::new();
 
         for _ in 0..n {
             list.push_back(Small::default(), token);
@@ -31,7 +31,7 @@ fn push_back_std_small(n: usize) {
 
 fn push_back_crate_big(n: usize) {
     GhostToken::new(|ref mut token| {
-        let mut list = rope::DLList::new();
+        let mut list = linked_list::LinkedList::new();
 
         for _ in 0..n {
             list.push_back(Big::default(), token);
