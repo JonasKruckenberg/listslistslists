@@ -54,12 +54,12 @@ jobs:
         env:
           RUSTFLAGS: "-Z sanitizer=leak"
 
-      - name: Thread Sanitizer
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-        env:
-          RUSTFLAGS: "-Z sanitizer=thread"
+      # - name: Thread Sanitizer
+      #   uses: actions-rs/cargo@v1
+      #   with:
+      #     command: test
+      #   env:
+      #     RUSTFLAGS: "-Z sanitizer=thread"
       
       - name: Address Sanitizer
         uses: actions-rs/cargo@v1
