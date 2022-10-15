@@ -95,7 +95,10 @@ jobs:
           export TSAN_OPTIONS="suppressions=$GITHUB_WORKSPACE/blacklist.txt"
           cargo test
         env:
-          RUSTFLAGS: "-Z sanitizer=leak"
+          CFLAGS: "-fsanitize=memory"
+          CXXFLAGS: "-fsanitize=memory"
+          RUSTFLAGS: "-Zsanitizer=memory"
+          RUSTDOCFLAGS: "-Zsanitizer=memory"
 
   thread-sanitizer:
     runs-on: ubuntu-latest
@@ -118,7 +121,10 @@ jobs:
           export TSAN_OPTIONS="suppressions=$GITHUB_WORKSPACE/blacklist.txt"
           cargo test
         env:
-          RUSTFLAGS: "-Z sanitizer=thread"
+          CFLAGS: "-fsanitize=memory"
+          CXXFLAGS: "-fsanitize=memory"
+          RUSTFLAGS: "-Zsanitizer=memory"
+          RUSTDOCFLAGS: "-Zsanitizer=memory"
 
   address-sanitizer:
     runs-on: ubuntu-latest
@@ -141,7 +147,10 @@ jobs:
           export TSAN_OPTIONS="suppressions=$GITHUB_WORKSPACE/blacklist.txt"
           cargo test
         env:
-          RUSTFLAGS: "-Z sanitizer=address"
+          CFLAGS: "-fsanitize=memory"
+          CXXFLAGS: "-fsanitize=memory"
+          RUSTFLAGS: "-Zsanitizer=memory"
+          RUSTDOCFLAGS: "-Zsanitizer=memory"
 
   memory-sanitizer:
     runs-on: ubuntu-latest
@@ -164,4 +173,7 @@ jobs:
           export TSAN_OPTIONS="suppressions=$GITHUB_WORKSPACE/blacklist.txt"
           cargo test
         env:
-          RUSTFLAGS: "-Z sanitizer=memory"
+          CFLAGS: "-fsanitize=memory"
+          CXXFLAGS: "-fsanitize=memory"
+          RUSTFLAGS: "-Zsanitizer=memory"
+          RUSTDOCFLAGS: "-Zsanitizer=memory"
