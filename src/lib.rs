@@ -1,4 +1,4 @@
-// #![no_std]
+#![no_std]
 
 use ghost_cell::{GhostCell, GhostCursor, GhostToken};
 use static_rc::StaticRc;
@@ -248,53 +248,53 @@ impl<'id, T> DLList<'id, T> {
         node.value
     }
 
-    pub fn dot<W: core::fmt::Write>(&self, f: &mut W, token: &GhostToken<'id>) -> core::fmt::Result
-    where
-        T: std::fmt::Display,
-    {
-        writeln!(f, "digraph {{")?;
-        writeln!(f, "rankdir=LR;")?;
-        writeln!(f, "node [shape=record];")?;
-        writeln!(f, "0 [label=\"nil\" shape=circle];")?;
+    // pub fn dot<W: core::fmt::Write>(&self, f: &mut W, token: &GhostToken<'id>) -> core::fmt::Result
+    // where
+    //     T: std::fmt::Display,
+    // {
+    //     writeln!(f, "digraph {{")?;
+    //     writeln!(f, "rankdir=LR;")?;
+    //     writeln!(f, "node [shape=record];")?;
+    //     writeln!(f, "0 [label=\"nil\" shape=circle];")?;
 
-        let mut i = 1;
+    //     let mut i = 1;
 
-        let mut c = Cursor::new_front(self, token);
+    //     let mut c = Cursor::new_front(self, token);
 
-        loop {
-            let node = c.node.as_ref().unwrap().borrow(token);
+    //     loop {
+    //         let node = c.node.as_ref().unwrap().borrow(token);
 
-            writeln!(
-                f,
-                "{} [label=\"{{ <left> | <data> {} | <right> }}\"];",
-                i, node.value
-            )?;
+    //         writeln!(
+    //             f,
+    //             "{} [label=\"{{ <left> | <data> {} | <right> }}\"];",
+    //             i, node.value
+    //         )?;
 
-            writeln!(
-                f,
-                "{}:left:c -> {}:data:n [arrowhead=vee, arrowtail=dot, dir=both, tailclip=false];",
-                i,
-                i - 1
-            )?;
-            writeln!(
-                f,
-                "{}:right:c -> {}:data:s [arrowhead=vee, arrowtail=dot, dir=both, tailclip=false];",
-                i,
-                i + 1
-            )?;
+    //         writeln!(
+    //             f,
+    //             "{}:left:c -> {}:data:n [arrowhead=vee, arrowtail=dot, dir=both, tailclip=false];",
+    //             i,
+    //             i - 1
+    //         )?;
+    //         writeln!(
+    //             f,
+    //             "{}:right:c -> {}:data:s [arrowhead=vee, arrowtail=dot, dir=both, tailclip=false];",
+    //             i,
+    //             i + 1
+    //         )?;
 
-            i += 1;
+    //         i += 1;
 
-            if !c.move_right() {
-                break;
-            }
-        }
+    //         if !c.move_right() {
+    //             break;
+    //         }
+    //     }
 
-        writeln!(f, "{} [label=\"nil\" shape=circle];", i)?;
-        write!(f, "}}")?;
+    //     writeln!(f, "{} [label=\"nil\" shape=circle];", i)?;
+    //     write!(f, "}}")?;
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 }
 
 pub struct Node<'id, T> {
@@ -464,10 +464,14 @@ mod test {
             assert_eq!(list.len(token), 6);
             assert!(other.is_empty());
 
-            assert_eq!(
-                list.iter(token).copied().collect::<Vec<_>>(),
-                vec![1, 2, 3, 4, 5, 6]
-            );
+            let mut iter = list.iter(token).copied();
+            assert_eq!(iter.next(), Some(1));
+            assert_eq!(iter.next(), Some(2));
+            assert_eq!(iter.next(), Some(3));
+            assert_eq!(iter.next(), Some(4));
+            assert_eq!(iter.next(), Some(5));
+            assert_eq!(iter.next(), Some(6));
+            assert_eq!(iter.next(), None);
 
             list.clear(token);
             other.clear(token);
@@ -485,10 +489,14 @@ mod test {
             assert_eq!(list.len(token), 6);
             assert!(other.is_empty());
 
-            assert_eq!(
-                list.iter(token).copied().collect::<Vec<_>>(),
-                vec![4, 5, 6, 1, 2, 3]
-            );
+            let mut iter = list.iter(token).copied();
+            assert_eq!(iter.next(), Some(4));
+            assert_eq!(iter.next(), Some(5));
+            assert_eq!(iter.next(), Some(6));
+            assert_eq!(iter.next(), Some(1));
+            assert_eq!(iter.next(), Some(2));
+            assert_eq!(iter.next(), Some(3));
+            assert_eq!(iter.next(), None);
 
             list.clear(token);
             other.clear(token);
@@ -505,14 +513,23 @@ mod test {
             assert_eq!(list.len(token), 5);
             assert_eq!(other.len(token), 7);
 
-            assert_eq!(
-                list.iter(token).copied().collect::<Vec<_>>(),
-                vec![1, 2, 3, 4, 5]
-            );
-            assert_eq!(
-                other.iter(token).copied().collect::<Vec<_>>(),
-                vec![6, 7, 8, 9, 10, 11, 12]
-            );
+            let mut iter = list.iter(token).copied();
+            assert_eq!(iter.next(), Some(1));
+            assert_eq!(iter.next(), Some(2));
+            assert_eq!(iter.next(), Some(3));
+            assert_eq!(iter.next(), Some(4));
+            assert_eq!(iter.next(), Some(5));
+            assert_eq!(iter.next(), None);
+
+            let mut iter = other.iter(token).copied();
+            assert_eq!(iter.next(), Some(6));
+            assert_eq!(iter.next(), Some(7));
+            assert_eq!(iter.next(), Some(8));
+            assert_eq!(iter.next(), Some(9));
+            assert_eq!(iter.next(), Some(10));
+            assert_eq!(iter.next(), Some(11));
+            assert_eq!(iter.next(), Some(12));
+            assert_eq!(iter.next(), None);
 
             list.clear(token);
             other.clear(token);
