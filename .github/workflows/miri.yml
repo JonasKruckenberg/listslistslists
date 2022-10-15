@@ -7,7 +7,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-rust:
+  clippy:
     runs-on: ubuntu-latest
 
     steps:
@@ -30,16 +30,45 @@ jobs:
           args: --all-targets --all-features -- -D warnings
           name: clippy
 
+jobs:
+  rustfmt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install clippy with stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: clippy, rustfmt, miri
+
+      - uses: Swatinem/rust-cache@v1
+
       - name: Rustfmt Check
         uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: -- --check
       
-      - name: Runs Tests
-        uses: actions-rs/cargo@v1
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install clippy with stable toolchain
+        uses: actions-rs/toolchain@v1
         with:
-          command: test
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: clippy, rustfmt, miri
+
+      - uses: Swatinem/rust-cache@v1
 
       - name: Run Tests With Miri
         uses: actions-rs/cargo@v1
@@ -47,34 +76,98 @@ jobs:
           command: miri
           args: test
 
-      - name: Leak Sanitizer
-        uses: actions-rs/cargo@v1
+jobs:
+  leak-sanitizer:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install clippy with stable toolchain
+        uses: actions-rs/toolchain@v1
         with:
-          command: test
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: clippy, rustfmt, miri
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: Leak Sanitizer
+        run: |
+          export TSAN_OPTIONS="suppressions=$GITHUB_WORKSPACE/blacklist.txt"
+          cargo test
         env:
           RUSTFLAGS: "-Z sanitizer=leak"
-          TSAN_OPTIONS: "suppressions=$GITHUB_WORKSPACE/san-blacklist.txt"
+
+jobs:
+  thread-sanitizer:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install clippy with stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: clippy, rustfmt, miri
+
+      - uses: Swatinem/rust-cache@v1
 
       - name: Thread Sanitizer
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: |
+          export TSAN_OPTIONS="suppressions=$GITHUB_WORKSPACE/blacklist.txt"
+          cargo test
         env:
           RUSTFLAGS: "-Z sanitizer=thread"
-          TSAN_OPTIONS: "suppressions=$GITHUB_WORKSPACE/san-blacklist.txt"
-      
-      - name: Address Sanitizer
-        uses: actions-rs/cargo@v1
+
+jobs:
+  address-sanitizer:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install clippy with stable toolchain
+        uses: actions-rs/toolchain@v1
         with:
-          command: test
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: clippy, rustfmt, miri
+
+      - uses: Swatinem/rust-cache@v1
+    
+      - name: Address Sanitizer
+        run: |
+          export TSAN_OPTIONS="suppressions=$GITHUB_WORKSPACE/blacklist.txt"
+          cargo test
         env:
           RUSTFLAGS: "-Z sanitizer=address"
-          TSAN_OPTIONS: "suppressions=$GITHUB_WORKSPACE/san-blacklist.txt"
+
+jobs:
+  memory-sanitizer:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install clippy with stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: clippy, rustfmt, miri
+
+      - uses: Swatinem/rust-cache@v1
 
       - name: Memory Sanitizer
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: |
+          export TSAN_OPTIONS="suppressions=$GITHUB_WORKSPACE/blacklist.txt"
+          cargo test
         env:
           RUSTFLAGS: "-Z sanitizer=memory"
-          TSAN_OPTIONS: "suppressions=$GITHUB_WORKSPACE/san-blacklist.txt"
