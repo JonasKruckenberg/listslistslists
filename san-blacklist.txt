@@ -1,1 +1,1 @@
-use-of-uninitialized-value:libc
+called_from_lib:libc
