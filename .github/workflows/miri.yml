@@ -86,7 +86,6 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-          components: clippy, rustfmt, miri
 
       - uses: Swatinem/rust-cache@v1
 
@@ -112,7 +111,7 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-          components: clippy, rustfmt, miri
+          components: rust-src
 
       - uses: Swatinem/rust-cache@v1
 
@@ -138,7 +137,6 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-          components: clippy, rustfmt, miri
 
       - uses: Swatinem/rust-cache@v1
     
@@ -164,7 +162,7 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-          components: clippy, rustfmt, miri
+          components: rust-src
 
       - uses: Swatinem/rust-cache@v1
 
