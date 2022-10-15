@@ -53,13 +53,15 @@ jobs:
           command: test
         env:
           RUSTFLAGS: "-Z sanitizer=leak"
+          TSAN_OPTIONS: "suppressions=san-blacklist.txt"
 
-      # - name: Thread Sanitizer
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: test
-      #   env:
-      #     RUSTFLAGS: "-Z sanitizer=thread"
+      - name: Thread Sanitizer
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+        env:
+          RUSTFLAGS: "-Z sanitizer=thread"
+          TSAN_OPTIONS: "suppressions=san-blacklist.txt"
       
       - name: Address Sanitizer
         uses: actions-rs/cargo@v1
@@ -67,6 +69,7 @@ jobs:
           command: test
         env:
           RUSTFLAGS: "-Z sanitizer=address"
+          TSAN_OPTIONS: "suppressions=san-blacklist.txt"
 
       - name: Memory Sanitizer
         uses: actions-rs/cargo@v1
@@ -74,3 +77,4 @@ jobs:
           command: test
         env:
           RUSTFLAGS: "-Z sanitizer=memory"
+          TSAN_OPTIONS: "suppressions=san-blacklist.txt"
