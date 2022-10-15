@@ -294,6 +294,12 @@ impl<'id, T> LinkedList<'id, T> {
     // }
 }
 
+impl<'id, T> Default for LinkedList<'id, T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Node<'id, T> {
     value: T,
     left: Option<HalfNodePtr<'id, T>>,

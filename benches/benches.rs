@@ -10,36 +10,36 @@ struct Small(usize);
 #[derive(Default)]
 struct Big([usize; 32]);
 
-fn push_back_static_rc_small(n: usize) {
-    GhostToken::new(|ref mut token| {
-        let mut list = linked_list::static_rc::LinkedList::new();
+// fn push_back_static_rc_small(n: usize) {
+//     GhostToken::new(|ref mut token| {
+//         let mut list = linked_list::static_rc::LinkedList::new();
 
-        for _ in 0..n {
-            list.push_back(Small::default(), token);
-        }
+//         for _ in 0..n {
+//             list.push_back(Small::default(), token);
+//         }
 
-        list.clear(token);
-    });
-}
+//         list.clear(token);
+//     });
+// }
 
-fn push_back_slab_small(n: usize) {
-    GhostToken::new(|ref mut token| {
-        let arena = Arena::new();
-        let mut list = linked_list::arena::LinkedList::new(&arena);
+// fn push_back_slab_small(n: usize) {
+//     GhostToken::new(|ref mut token| {
+//         let arena = Arena::new();
+//         let mut list = linked_list::arena::LinkedList::new();
 
-        for _ in 0..n {
-            list.push_back(Small::default(), token);
-        }
-    });
-}
+//         for _ in 0..n {
+//             list.push_back(Small::default(), &arena, token);
+//         }
+//     });
+// }
 
-fn push_back_std_small(n: usize) {
-    let mut list = std::collections::LinkedList::new();
+// fn push_back_std_small(n: usize) {
+//     let mut list = std::collections::LinkedList::new();
 
-    for _ in 0..n {
-        list.push_back(Small::default());
-    }
-}
+//     for _ in 0..n {
+//         list.push_back(Small::default());
+//     }
+// }
 
 fn push_back_static_rc_big(n: usize) {
     GhostToken::new(|ref mut token| {
@@ -56,10 +56,11 @@ fn push_back_static_rc_big(n: usize) {
 fn push_back_slab_big(n: usize) {
     GhostToken::new(|ref mut token| {
         let arena = Arena::with_capacity(n);
-        let mut list = linked_list::arena::LinkedList::new(&arena);
+
+        let mut list = linked_list::arena::LinkedList::new();
 
         for _ in 0..n {
-            list.push_back(Big::default(), token);
+            list.push_back(Big::default(), &arena, token);
         }
     });
 }
