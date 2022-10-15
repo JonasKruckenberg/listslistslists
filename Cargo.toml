@@ -7,9 +7,13 @@ edition = "2021"
 
 [dependencies]
 ghost-cell = { version = "0.2.2", features = ["experimental-ghost-cursor"]}
-slab = "0.4.7"
-smallvec = "1.10.0"
+# slab = "0.4.7"
+# smallvec = "1.10.0"
 static-rc = { version = "0.6.0", features = ["compile-time-ratio", "experimental-lift"] }
 
 [dev-dependencies]
-libc-print = "0.1.20"
+criterion = "0.3"
+
+[[bench]]
+name = "benches"
+harness = false
