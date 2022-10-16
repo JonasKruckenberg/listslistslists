@@ -7,13 +7,12 @@ edition = "2021"
 
 [dependencies]
 ghost-cell = { version = "0.2.2", features = ["experimental-ghost-cursor"]}
-slab = "0.4.7"
-# smallvec = "1.10.0"
-static-rc = { version = "0.6.0", features = ["compile-time-ratio", "experimental-lift"] }
+static-rc = { version = "0.6.0", default-features = false, features = ["compile-time-ratio", "experimental-lift"] }
 typed-arena = "2.0.1"
 
 [dev-dependencies]
 criterion = "0.3"
+ghost-collections = { git = "https://github.com/matthieu-m/ghost-collections" }
 
 [[bench]]
 name = "benches"

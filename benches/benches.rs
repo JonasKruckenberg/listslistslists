@@ -1,49 +1,14 @@
-use std::collections::VecDeque;
-
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use ghost_cell::GhostToken;
+use std::collections::VecDeque;
 use typed_arena::Arena;
-
-#[derive(Default)]
-struct Small(usize);
 
 #[derive(Default)]
 struct Big([usize; 32]);
 
-// fn push_back_static_rc_small(n: usize) {
-//     GhostToken::new(|ref mut token| {
-//         let mut list = linked_list::static_rc::LinkedList::new();
-
-//         for _ in 0..n {
-//             list.push_back(Small::default(), token);
-//         }
-
-//         list.clear(token);
-//     });
-// }
-
-// fn push_back_slab_small(n: usize) {
-//     GhostToken::new(|ref mut token| {
-//         let arena = Arena::new();
-//         let mut list = linked_list::arena::LinkedList::new();
-
-//         for _ in 0..n {
-//             list.push_back(Small::default(), &arena, token);
-//         }
-//     });
-// }
-
-// fn push_back_std_small(n: usize) {
-//     let mut list = std::collections::LinkedList::new();
-
-//     for _ in 0..n {
-//         list.push_back(Small::default());
-//     }
-// }
-
-fn push_back_static_rc_big(n: usize) {
+fn push_back_ghost_collections_big(n: usize) {
     GhostToken::new(|ref mut token| {
-        let mut list = linked_list::static_rc::LinkedList::new();
+        let mut list = ghost_collections::linked_list::LinkedList::new();
 
         for _ in 0..n {
             list.push_back(Big::default(), token);
@@ -57,7 +22,7 @@ fn push_back_slab_big(n: usize) {
     GhostToken::new(|ref mut token| {
         let arena = Arena::with_capacity(n);
 
-        let mut list = linked_list::arena::LinkedList::new(&arena);
+        let mut list = linked_list::LinkedList::new(&arena);
 
         for _ in 0..n {
             list.push_back(Big::default(), token);
@@ -81,34 +46,12 @@ fn push_back_vec_big(n: usize) {
     }
 }
 
-fn bench_fibs(c: &mut Criterion) {
-    // let mut group = c.benchmark_group("push_back_small");
-    // for i in [20, 40, 60, 80].iter() {
-    //     group
-    //         .bench_with_input(BenchmarkId::new("static-rc", i), i, |b, i| {
-    //             b.iter(|| push_back_static_rc_small(*i))
-    //         })
-    //         .throughput(Throughput::Elements(*i as u64));
-
-    //     group
-    //         .bench_with_input(BenchmarkId::new("arena", i), i, |b, i| {
-    //             b.iter(|| push_back_slab_small(*i))
-    //         })
-    //         .throughput(Throughput::Elements(*i as u64));
-
-    //     group
-    //         .bench_with_input(BenchmarkId::new("std", i), i, |b, i| {
-    //             b.iter(|| push_back_std_small(*i))
-    //         })
-    //         .throughput(Throughput::Elements(*i as u64));
-    // }
-    // group.finish();
-
+fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("push_back_big");
     for i in [100, 300, 500, 700].iter() {
         group
-            .bench_with_input(BenchmarkId::new("static-rc", i), i, |b, i| {
-                b.iter(|| push_back_static_rc_big(*i))
+            .bench_with_input(BenchmarkId::new("ghost-collections", i), i, |b, i| {
+                b.iter(|| push_back_ghost_collections_big(*i))
             })
             .throughput(Throughput::Elements(*i as u64));
 
@@ -125,7 +68,7 @@ fn bench_fibs(c: &mut Criterion) {
             .throughput(Throughput::Elements(*i as u64));
 
         group
-            .bench_with_input(BenchmarkId::new("vec", i), i, |b, i| {
+            .bench_with_input(BenchmarkId::new("vecdeque", i), i, |b, i| {
                 b.iter(|| push_back_vec_big(*i))
             })
             .throughput(Throughput::Elements(*i as u64));
@@ -133,5 +76,5 @@ fn bench_fibs(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_fibs);
+criterion_group!(benches, bench);
 criterion_main!(benches);
