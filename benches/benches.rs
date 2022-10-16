@@ -57,10 +57,10 @@ fn push_back_slab_big(n: usize) {
     GhostToken::new(|ref mut token| {
         let arena = Arena::with_capacity(n);
 
-        let mut list = linked_list::arena::LinkedList::new();
+        let mut list = linked_list::arena::LinkedList::new(&arena);
 
         for _ in 0..n {
-            list.push_back(Big::default(), &arena, token);
+            list.push_back(Big::default(), token);
         }
     });
 }

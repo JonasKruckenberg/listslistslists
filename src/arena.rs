@@ -1,24 +1,22 @@
 use ghost_cell::{GhostCell, GhostCursor, GhostToken};
+use static_rc::StaticRcRef;
 use typed_arena::Arena;
 
 pub struct LinkedList<'arena, 'id, T> {
-    head_tail: Option<(NodeRef<'arena, 'id, T>, NodeRef<'arena, 'id, T>)>,
+    arena: &'arena Arena<Node<'arena, 'id, T>>,
+    head_tail: Option<(HalfNodePtr<'arena, 'id, T>, HalfNodePtr<'arena, 'id, T>)>,
 }
 
 impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
-    pub fn new() -> Self {
-        Self { head_tail: None }
+    pub fn new(arena: &'arena Arena<Node<'arena, 'id, T>>,) -> Self {
+        Self { head_tail: None, arena }
     }
 
-    pub fn from_iter<I: IntoIterator<Item = T>>(
-        iter: I,
-        arena: &'arena Arena<Node<'arena, 'id, T>>,
-        token: &mut GhostToken<'id>,
-    ) -> Self {
-        let mut list = LinkedList::new();
+    pub fn from_iter<I: IntoIterator<Item = T>>(iter: I, arena: &'arena Arena<Node<'arena, 'id, T>>, token: &mut GhostToken<'id>) -> Self {
+        let mut list = LinkedList::new(arena);
 
         for value in iter.into_iter() {
-            list.push_back(value, arena, token)
+            list.push_back(value, token)
         }
 
         list
@@ -60,41 +58,31 @@ impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
         CursorMut::new_front(self, token)
     }
 
-    pub fn push_front(
-        &mut self,
-        value: T,
-        arena: &'arena Arena<Node<'arena, 'id, T>>,
-        token: &mut GhostToken<'id>,
-    ) {
-        let new_node = self.insert(value, arena, token);
+    pub fn push_front(&mut self, value: T, token: &mut GhostToken<'id>) {
+        let (one, two) = self.new_halves(value);
 
         let head_tail = if let Some((head, tail)) = self.head_tail.take() {
-            head.borrow_mut(token).left = Some(new_node);
-            new_node.borrow_mut(token).right = Some(head);
+            head.borrow_mut(token).left = Some(one);
+            two.borrow_mut(token).right = Some(head);
 
-            (new_node, tail)
+            (two, tail)
         } else {
-            (new_node, new_node)
+            (one, two)
         };
 
         self.head_tail = Some(head_tail)
     }
 
-    pub fn push_back(
-        &mut self,
-        value: T,
-        arena: &'arena Arena<Node<'arena, 'id, T>>,
-        token: &mut GhostToken<'id>,
-    ) {
-        let new_node = self.insert(value, arena, token);
+    pub fn push_back(&mut self, value: T, token: &mut GhostToken<'id>) {
+        let (one, two) = self.new_halves(value);
 
         let head_tail = if let Some((head, tail)) = self.head_tail.take() {
-            tail.borrow_mut(token).right = Some(new_node);
-            new_node.borrow_mut(token).left = Some(tail);
+            tail.borrow_mut(token).right = Some(one);
+            two.borrow_mut(token).left = Some(tail);
 
-            (head, new_node)
+            (head, two)
         } else {
-            (new_node, new_node)
+            (one, two)
         };
 
         self.head_tail = Some(head_tail)
@@ -104,36 +92,24 @@ impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
         let (head, tail) = self.head_tail.take()?;
 
         // when there is only one element in the list
-        if head.as_ptr() == tail.as_ptr() {
-            // freelist.push(head);
-            return head.borrow_mut(token).value.take();
+        if StaticRcRef::as_ptr(&head) == StaticRcRef::as_ptr(&tail) {
+            return Some(Self::into_inner(head, tail, token));
         }
 
-        let next = head
-            .borrow_mut(token)
-            .right
-            .take()
-            .expect("Non-tail should have a right node");
-
-        let _other_head = next
-            .borrow_mut(token)
-            .left
-            .take()
-            .expect("Non-head should have a left node");
+        let next = head.borrow_mut(token).right.take().unwrap();
+        let other_head = next.borrow_mut(token).left.take().unwrap();
 
         self.head_tail = Some((next, tail));
 
-        // freelist.push(head);
-        head.borrow_mut(token).value.take()
+        Some(Self::into_inner(head, other_head, token))
     }
 
     pub fn pop_back(&mut self, token: &mut GhostToken<'id>) -> Option<T> {
         let (head, tail) = self.head_tail.take()?;
 
         // when there is only one element in the list
-        if head.as_ptr() == tail.as_ptr() {
-            // freelist.push(head);
-            return head.borrow_mut(token).value.take();
+        if StaticRcRef::as_ptr(&head) == StaticRcRef::as_ptr(&tail) {
+            return Some(Self::into_inner(head, tail, token));
         }
 
         let prev = tail
@@ -141,7 +117,7 @@ impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
             .left
             .take()
             .expect("Non-head should have a left node");
-        let _ = prev
+        let other_tail = prev
             .borrow_mut(token)
             .right
             .take()
@@ -149,8 +125,7 @@ impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
 
         self.head_tail = Some((head, prev));
 
-        // freelist.push(tail);
-        tail.borrow_mut(token).value.take()
+        Some(Self::into_inner(tail, other_tail, token))
     }
 
     pub fn append(&mut self, other: &mut Self, token: &mut GhostToken<'id>) {
@@ -194,15 +169,40 @@ impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
         core::mem::swap(self, other);
     }
 
-    pub fn split_off(
-        &mut self,
-        at: usize,
-        arena: &'arena Arena<Node<'arena, 'id, T>>,
+    // pub fn split_off(&mut self, at: usize, token: &mut GhostToken<'id>) -> Option<Self> {
+    // let mut cursor = GhostCursor::new(
+    //     token,
+    //     self.head_tail
+    //         .as_ref()
+    //         .map(|(head, _)| core::borrow::Borrow::borrow(head)),
+    // );
 
-        token: &mut GhostToken<'id>,
-    ) -> Option<Self> {
+    //     for _ in 0..at {
+    //         cursor
+    //             .move_mut(|node| node.right.as_ref().map(core::borrow::Borrow::borrow))
+    //             .ok()?;
+    //     }
+
+    //     let mid_head = cursor.borrow_mut()?.right.take()?;
+
+    //     cursor
+    //         .move_mut(|node| node.right.as_ref().map(core::borrow::Borrow::borrow))
+    //         .ok()?;
+
+    //     let mid_tail = cursor.borrow_mut()?.left.take()?;
+
+    //     let (head, tail) = self.head_tail.take()?;
+    //     self.head_tail = Some((head, mid_tail));
+
+    //     let mut other = DLList::new();
+    //     other.head_tail = Some((mid_head, tail));
+
+    //     Some(other)
+    // }
+
+    pub fn split_off(&mut self, at: usize, token: &mut GhostToken<'id>) -> Option<Self> {
         //  This is not the most optimal implementation, but it works, and respects the promised algorithmic complexity.
-        let mut head = Self::new();
+        let mut head = Self::new(self.arena);
 
         for _ in 0..at {
             let element = if let Some(element) = self.pop_front(token) {
@@ -212,7 +212,7 @@ impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
                 self.prepend(&mut head, token);
                 return None;
             };
-            head.push_back(element, arena, token);
+            head.push_back(element, token);
         }
 
         core::mem::swap(self, &mut head);
@@ -224,25 +224,28 @@ impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
         while self.pop_back(token).is_some() {}
     }
 
-    fn insert(
-        &mut self,
-        value: T,
-        arena: &'arena Arena<Node<'arena, 'id, T>>,
-        _token: &mut GhostToken<'id>,
-    ) -> NodeRef<'arena, 'id, T> {
-        // if let Some(node) = freelist.pop() {
-        //     let out = node.borrow_mut(token).value.replace(value);
-
-        //     debug_assert!(out.is_none());
-
-        //     node
-        // } else {
-        GhostCell::from_mut(arena.alloc(Node {
+    fn new_halves(&self, value: T) -> (HalfNodePtr<'arena, 'id, T>, HalfNodePtr<'arena, 'id, T>) {
+        let node = self.arena.alloc(Node {
             value: Some(value),
             left: None,
             right: None,
-        }))
-        // }
+        });
+
+        let full = FullNodePtr::new(GhostNode::from_mut(node));
+
+        StaticRcRef::split::<1, 1>(full)
+    }
+
+    fn into_inner(left: HalfNodePtr<'arena, 'id, T>, right: HalfNodePtr<'arena, 'id, T>, token: &mut GhostToken<'id>) -> T {
+        let full = FullNodePtr::join(left, right);
+        let ghost_cell = FullNodePtr::into_inner(full);
+        let node = ghost_cell.borrow_mut(token);
+
+        //  If the node still has a prev and next, they are leaked.
+        debug_assert!(node.left.is_none());
+        debug_assert!(node.right.is_none());
+
+        node.value.take().unwrap()
     }
 
     // pub fn dot<W: core::fmt::Write>(&self, f: &mut W, token: &GhostToken<'id>) -> core::fmt::Result
@@ -294,37 +297,31 @@ impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
     // }
 }
 
-impl<'arena, 'id, T> Default for LinkedList<'arena, 'id, T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-type NodeRef<'arena, 'id, T> = &'arena GhostCell<'id, Node<'arena, 'id, T>>;
-
-pub struct Node<'arena, 'id, T> {
+pub struct Node<'arena,'id, T> {
     value: Option<T>,
-    left: Option<NodeRef<'arena, 'id, T>>,
-    right: Option<NodeRef<'arena, 'id, T>>,
+    left: Option<HalfNodePtr<'arena,'id, T>>,
+    right: Option<HalfNodePtr<'arena,'id, T>>,
 }
+
+type GhostNode<'arena,'id, T> = GhostCell<'id, Node<'arena,'id, T>>;
+
+type HalfNodePtr<'arena,'id, T> = StaticRcRef<'arena, GhostNode<'arena,'id, T>, 1, 2>;
+type FullNodePtr<'arena,'id, T> = StaticRcRef<'arena, GhostNode<'arena,'id, T>, 2, 2>;
 
 pub struct Cursor<'a, 'arena, 'id, T> {
     token: &'a GhostToken<'id>,
-    node: Option<NodeRef<'arena, 'id, T>>,
+    node: Option<&'a GhostNode<'arena, 'id, T>>,
 }
 
-impl<'a, 'arena, 'id, T> Cursor<'a, 'arena, 'id, T>
-where
-    'arena: 'a,
-{
+impl<'a, 'arena, 'id, T> Cursor<'a, 'arena, 'id, T> {
     pub fn new_front(list: &'a LinkedList<'arena, 'id, T>, token: &'a GhostToken<'id>) -> Self {
-        let node = list.head_tail.as_ref().map(|head_tail| head_tail.0);
+        let node = list.head_tail.as_ref().map(|head_tail| &*head_tail.0);
 
         Self { token, node }
     }
 
     pub fn new_back(list: &'a LinkedList<'arena, 'id, T>, token: &'a GhostToken<'id>) -> Self {
-        let node = list.head_tail.as_ref().map(|head_tail| head_tail.1);
+        let node = list.head_tail.as_ref().map(|head_tail| &*head_tail.1);
 
         Self { token, node }
     }
@@ -365,12 +362,12 @@ where
         self.peek_left_node()?.borrow(self.token).value.as_ref()
     }
 
-    fn peek_right_node(&self) -> Option<NodeRef<'arena, 'id, T>> {
-        self.node?.borrow(self.token).right
+    fn peek_right_node(&self) -> Option<&'a GhostNode<'arena, 'id, T>> {
+        self.node?.borrow(self.token).right.as_deref()
     }
 
-    fn peek_left_node(&self) -> Option<NodeRef<'arena, 'id, T>> {
-        self.node?.borrow(self.token).left
+    fn peek_left_node(&self) -> Option<&'a GhostNode<'arena, 'id, T>> {
+        self.node?.borrow(self.token).left.as_deref()
     }
 }
 
@@ -378,12 +375,9 @@ pub struct CursorMut<'a, 'arena, 'id, T> {
     inner: GhostCursor<'a, 'id, Node<'arena, 'id, T>>,
 }
 
-impl<'a, 'arena, 'id, T> CursorMut<'a, 'arena, 'id, T>
-where
-    'arena: 'a,
-{
+impl<'a, 'arena, 'id, T> CursorMut<'a, 'arena, 'id, T> {
     pub fn new_front(list: &'a LinkedList<'arena, 'id, T>, token: &'a mut GhostToken<'id>) -> Self {
-        let node = list.head_tail.as_ref().map(|head_tail| head_tail.0);
+        let node = list.head_tail.as_ref().map(|head_tail| &*head_tail.0);
 
         Self {
             inner: GhostCursor::new(token, node),
@@ -391,28 +385,25 @@ where
     }
 
     pub fn new_back(list: &'a LinkedList<'arena, 'id, T>, token: &'a mut GhostToken<'id>) -> Self {
-        let node = list.head_tail.as_ref().map(|head_tail| head_tail.1);
+        let node = list.head_tail.as_ref().map(|head_tail| &*head_tail.1);
 
         Self {
             inner: GhostCursor::new(token, node),
         }
     }
 
-    pub fn into_cursor(self) -> Cursor<'a, 'arena, 'id, T>
-    where
-        'a: 'arena,
-    {
+    pub fn into_cursor(self) -> Cursor<'a, 'arena, 'id, T> {
         let (token, node) = self.inner.into_parts();
 
         Cursor { token, node }
     }
 
     pub fn move_right(&mut self) -> bool {
-        self.inner.move_mut(|node| node.right).is_ok()
+        self.inner.move_mut(|node| node.right.as_deref()).is_ok()
     }
 
     pub fn move_left(&mut self) -> bool {
-        self.inner.move_mut(|node| node.left).is_ok()
+        self.inner.move_mut(|node| node.left.as_deref()).is_ok()
     }
 
     pub fn current(&mut self) -> Option<&mut T> {
@@ -431,12 +422,12 @@ where
         self.peek_left_node()?.borrow(token).value.as_ref()
     }
 
-    fn peek_right_node(&self) -> Option<NodeRef<'arena, 'id, T>> {
-        self.inner.borrow()?.right
+    fn peek_right_node(&self) -> Option<&GhostNode<'arena, 'id, T>> {
+        self.inner.borrow().and_then(|node| node.right.as_deref())
     }
 
-    fn peek_left_node(&self) -> Option<NodeRef<'arena, 'id, T>> {
-        self.inner.borrow()?.left
+    fn peek_left_node(&self) -> Option<&GhostNode<'arena, 'id, T>> {
+        self.inner.borrow().and_then(|node| node.left.as_deref())
     }
 }
 
@@ -444,11 +435,7 @@ pub struct Iter<'a, 'arena, 'id, T> {
     inner: Cursor<'a, 'arena, 'id, T>,
 }
 
-impl<'a, 'arena, 'id, T> Iterator for Iter<'a, 'arena, 'id, T>
-where
-    T: 'a,
-    'arena: 'a,
-{
+impl<'a, 'arena, 'id, T> Iterator for Iter<'a, 'arena, 'id, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -470,7 +457,7 @@ mod test {
             let arena = Arena::new();
 
             let mut list = LinkedList::from_iter([1, 2, 3], &arena, token);
-            let mut other = LinkedList::from_iter([4, 5, 6], &arena, token);
+            let mut other = LinkedList::from_iter([4, 5, 6], &arena,token);
 
             list.append(&mut other, token);
 
@@ -485,10 +472,9 @@ mod test {
             assert_eq!(iter.next(), Some(5));
             assert_eq!(iter.next(), Some(6));
             assert_eq!(iter.next(), None);
-            drop(iter);
 
-            // list.clear(token);
-            // other.clear(token);
+            list.clear(token);
+            other.clear(token);
         })
     }
 
@@ -514,8 +500,8 @@ mod test {
             assert_eq!(iter.next(), Some(3));
             assert_eq!(iter.next(), None);
 
-            // list.clear(token);
-            // other.clear(token);
+            list.clear(token);
+            other.clear(token);
         })
     }
 
@@ -524,10 +510,9 @@ mod test {
         GhostToken::new(|ref mut token| {
             let arena = Arena::new();
 
-            let mut list =
-                LinkedList::from_iter([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], &arena, token);
+            let mut list = LinkedList::from_iter([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], &arena, token);
 
-            let mut other = list.split_off(5, &arena, token).unwrap();
+            let mut other = list.split_off(5, token).unwrap();
 
             assert_eq!(list.len(token), 5);
             assert_eq!(other.len(token), 7);
@@ -553,51 +538,5 @@ mod test {
             list.clear(token);
             other.clear(token);
         })
-    }
-
-    #[test]
-    fn freelist() {
-        GhostToken::new(|ref mut token| {
-            let arena = Arena::new();
-
-            let mut list = LinkedList::new();
-
-            list.push_back(42, &arena, token);
-            list.pop_back(token);
-            list.push_back(42, &arena, token);
-            list.pop_back(token);
-            list.push_back(42, &arena, token);
-            list.pop_back(token);
-            list.push_back(42, &arena, token);
-            list.pop_back(token);
-            list.push_back(42, &arena, token);
-            list.pop_back(token);
-            list.push_back(42, &arena, token);
-            list.pop_back(token);
-            list.push_back(42, &arena, token);
-
-            // assert_eq!(list.freelist.len(), 0);
-            assert_eq!(list.len(token), 1);
-
-            list.clear(token);
-
-            // assert_eq!(list.freelist.len(), 1);
-            assert_eq!(list.len(token), 0);
-
-            list.push_back(1, &arena, token);
-            list.push_back(2, &arena, token);
-            list.push_back(3, &arena, token);
-            list.push_back(4, &arena, token);
-            list.push_back(5, &arena, token);
-
-            assert_eq!(list.pop_back(token), Some(5));
-            assert_eq!(list.pop_front(token), Some(1));
-
-            let mut iter = list.iter(token).copied();
-            assert_eq!(iter.next(), Some(2));
-            assert_eq!(iter.next(), Some(3));
-            assert_eq!(iter.next(), Some(4));
-            assert_eq!(iter.next(), None);
-        });
     }
 }
