@@ -1,4 +1,4 @@
-// #![no_std]
+#![cfg_attr(not(test), no_std)]
 /// A doubly linked list using `StaticRc` and `GhostCell`
 ///
 /// Pros:
