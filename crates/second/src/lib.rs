@@ -8,6 +8,7 @@
 /// - iterators and cursors work
 /// - Insert and remove data without copying
 /// - No re-allocation required
+/// - Implementation is `Send` and `Sync`
 ///
 /// Cons:
 /// - requires tokens to be passed around
