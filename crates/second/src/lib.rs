@@ -1,4 +1,5 @@
 #![cfg_attr(not(test), no_std)]
+#![forbid(unsafe_code)]
 /// A doubly linked list using `StaticRc` and `GhostCell`
 ///
 /// Pros:
@@ -16,7 +17,7 @@
 /// - Allocates every node on the heap individually
 /// - requires nightly rust
 /// - list must be cleared before drop (will panic otherwise)
-/// 
+///
 use ghost_cell::{GhostCell, GhostToken};
 use static_rc::StaticRc;
 
@@ -37,7 +38,7 @@ impl<'id, T> LinkedList<'id, T> {
         self.len
     }
 
-    pub fn iter<'a>(&'a self, token: &'a mut GhostToken<'id>) -> Iter<'a, 'id, T> {
+    pub fn iter<'a>(&'a self, token: &'a GhostToken<'id>) -> Iter<'a, 'id, T> {
         Iter::new(token, self)
     }
 
@@ -271,13 +272,25 @@ mod test {
                 });
             });
 
-            let len = std::thread::scope(|s| {
-                s.spawn(|| list.len()).join().unwrap()
-            });
+            let len = std::thread::scope(|s| s.spawn(|| list.len()).join().unwrap());
 
             assert_eq!(len, 1);
 
             list.clear(token)
         })
+    }
+
+    #[derive(Default)]
+    struct Big([usize; 32]);
+
+    #[test]
+    fn push_back_first_big() {
+        GhostToken::new(|ref mut token| {
+            let mut list = LinkedList::new();
+
+            for _ in 0..500 {
+                list.push_back(Big::default(), token);
+            }
+        });
     }
 }

@@ -1,2 +1,9 @@
 [workspace]
 members = ["crates/*"]
+
+[profile.release]
+codegen-units = 1
+incremental = false
+lto = true
+opt-level = 3
+panic = "abort"

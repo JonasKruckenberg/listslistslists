@@ -1,4 +1,5 @@
 #![no_std]
+#![forbid(unsafe_code)]
 /// A doubly linked list using `Rc` and `RefCell`.
 ///  
 /// Pros:
@@ -127,6 +128,10 @@ impl<T> LinkedList<T> {
                 .value,
         )
     }
+
+    pub fn clear(&mut self) {
+        while self.pop_front().is_some() {}
+    }
 }
 
 impl<T> Drop for LinkedList<T> {
@@ -152,6 +157,25 @@ impl<T> Node<T> {
 }
 
 type NodeRef<T> = Rc<RefCell<Node<T>>>;
+
+pub struct IntoIter<T>(LinkedList<T>);
+
+impl<T> IntoIterator for LinkedList<T> {
+    type Item = T;
+
+    type IntoIter = IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter(self)
+    }
+}
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.pop_front()
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -194,5 +218,17 @@ mod test {
         assert_eq!(list.pop_back(), Some(1));
         assert_eq!(list.pop_back(), Some(2));
         assert_eq!(list.pop_back(), None);
+    }
+
+    #[derive(Default)]
+    struct Big([usize; 32]);
+
+    #[test]
+    fn push_back_first_big() {
+        let mut list = LinkedList::new();
+
+        for _ in 0..500 {
+            list.push_back(Big::default());
+        }
     }
 }
