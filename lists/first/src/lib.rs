@@ -1,7 +1,11 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 /// A doubly linked list using `Rc` and `RefCell`.
-///  
+/// 
+/// Allocation size per value:
+/// sizeof: RefCell<Node<T>> = usize + max(usize, T) + usize + usize
+/// => Overhead of list is between 24 and 32 bytes per entry
+/// 
 /// Pros:
 /// - No Dependencies
 /// - Fully `no_std`
@@ -230,5 +234,32 @@ mod test {
         for _ in 0..500 {
             list.push_back(Big::default());
         }
+    }
+
+    #[test]
+    fn node_size() {
+        // sizeof: RefCell<T> = usize + max(usize, T)
+
+        // Node<T> {
+        // value: size_of(T),
+        // prev: size_of(usize>),
+        // next: size_of(usize>)
+        // }
+
+        // sizeof: RefCell<Node<T>> = usize + max(usize, T) + usize + usize
+
+        // size_of::<RefCell<Node<u8>>> = 32
+        // => 8 + max(8, 1) + 8 + 8 = 32
+        // checks out!
+
+        // size_of::<RefCell<Node<usize>>> = 32
+        // => 8 + max(8, 8) + 8 + 8 = 32
+        // checks out!
+
+        // size_of::<RefCell<Node<Big>>> = 280
+        // => 8 + max(8, 256) + 8 + 8 = 280
+        // checks out!
+
+        panic!("{}", std::mem::size_of::<RefCell<Node<Big>>>());
     }
 }

@@ -1,7 +1,24 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 
-use slotmap::{SlotMap, DefaultKey};
+/// A doubly linked list using `slotmap` arena allocation
+///
+/// Allocation size per value:
+/// sizeof: Node<T> = max(4, T) + usize + usize
+/// => Overhead of list is between 16 and 19 bytes per entry
+/// 
+/// Pros:
+/// - *Fast* - Arena allocation is wayy faster than traditional heap allocation, freeing is even faster
+/// - Fully `no_std`
+/// - No unsafe & fully stable rust
+/// - Implementation is `Send` and `Sync`
+/// - No tokens required
+/// - Iteration works
+///
+/// Cons:
+/// - lot's of `unwrap()` => no compile time guarantees (similar to first's explicit `drop`)
+/// - still 3x slower than `VecDeque`
+use slotmap::{DefaultKey, SlotMap};
 
 pub struct LinkedList<T> {
     len: usize,
@@ -26,13 +43,15 @@ impl<T> LinkedList<T> {
         }
     }
 
-
     pub fn len(&self) -> usize {
         self.len
     }
 
     pub fn iter<'a>(&'a self) -> Iter<'a, T> {
-        Iter { list: self, head_tail: self.head_tail  }
+        Iter {
+            list: self,
+            head_tail: self.head_tail,
+        }
     }
 
     pub fn push_front(&mut self, value: T) {
@@ -105,7 +124,11 @@ impl<T> LinkedList<T> {
     }
 
     fn insert(&mut self, value: T) -> DefaultKey {
-        self.nodes.insert(Node { value, prev: None, next: None })
+        self.nodes.insert(Node {
+            value,
+            prev: None,
+            next: None,
+        })
     }
 
     fn get_mut(&mut self, node_ref: DefaultKey) -> Option<&mut Node<T>> {
@@ -118,12 +141,6 @@ impl<T> LinkedList<T> {
 
     fn remove(&mut self, node_ref: DefaultKey) -> Option<Node<T>> {
         self.nodes.remove(node_ref)
-    }
-}
-
-impl<T> Drop for LinkedList<T> {
-    fn drop(&mut self) {
-        while self.pop_front().is_some() {}
     }
 }
 
@@ -154,7 +171,7 @@ impl<T> Iterator for IntoIter<T> {
 
 pub struct Iter<'a, T> {
     list: &'a LinkedList<T>,
-    head_tail: Option<(DefaultKey, DefaultKey)>
+    head_tail: Option<(DefaultKey, DefaultKey)>,
 }
 
 impl<'a, T> Iterator for Iter<'a, T> {
@@ -166,9 +183,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
         let node = self.list.get(head).unwrap();
 
         if head != tail {
-            self.head_tail = node.next.map(|n| {
-                (n, tail)
-            });
+            self.head_tail = node.next.map(|n| (n, tail));
         } else {
             self.head_tail = None;
         }
@@ -184,9 +199,7 @@ impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
         let node = self.list.get(tail).unwrap();
 
         if head != tail {
-            self.head_tail = node.prev.map(|n| {
-                (head, n)
-            });
+            self.head_tail = node.prev.map(|n| (head, n));
         } else {
             self.head_tail = None;
         }
@@ -247,6 +260,48 @@ mod test {
         list.push_back(3);
         list.push_back(4);
 
-        assert_eq!(list.into_iter().collect::<Vec<_>>(), vec![1,2,3,4])
+        assert_eq!(list.into_iter().collect::<Vec<_>>(), vec![1, 2, 3, 4])
+    }
+
+    #[test]
+    fn send_sync() {
+        let mut list = LinkedList::new();
+
+        std::thread::scope(|s| {
+            s.spawn(|| {
+                list.push_back(1);
+            });
+        });
+
+        let len = std::thread::scope(|s| s.spawn(|| list.len()).join().unwrap());
+
+        assert_eq!(len, 1);
+    }
+
+    #[derive(Default)]
+    struct Big([usize; 32]);
+
+    #[test]
+    fn push_back_first_big() {
+        let mut list = LinkedList::new();
+
+        for _ in 0..500 {
+            list.push_back(Big::default());
+        }
+    }
+
+    #[test]
+    fn node_size() {
+        // sizeof: DefaultKey = 8
+
+        // sizeof: Node<u8> = 20 (- 1 = 19)
+        // sizeof: Node<u16> = 20 (- 2 = 18)
+        // sizeof: Node<u32> = 20 (- 4 = 16)
+        // sizeof: Node<usize> = 24 (- 8 = 16)
+        // sizeof: Node<Big> = 272 (- 8 = 16)
+
+        // sizeof: Node<T> = max(4, T) + usize + usize
+
+        panic!("{}", std::mem::size_of::<Node<Big>>());
     }
 }

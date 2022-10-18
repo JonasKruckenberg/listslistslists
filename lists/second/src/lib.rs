@@ -2,6 +2,10 @@
 #![forbid(unsafe_code)]
 /// A doubly linked list using `StaticRc` and `GhostCell`
 ///
+/// Allocation size per value:
+/// sizeof: GhostCell<Node<T>> = max(usize, T) + usize + usize
+/// => Overhead of list is between 16 and 24 bytes per entry
+/// 
 /// Pros:
 /// - Fully `no_std`
 /// - `StaticRc` and `GhostCell` are (almost) transparent types (`StaticRc` allocates) and have equivalent perf to raw pointers.
@@ -292,5 +296,21 @@ mod test {
                 list.push_back(Big::default(), token);
             }
         });
+    }
+
+    #[test]
+    fn node_size() {
+        // sizeof: GhostCell<T> = T
+
+        // Node<T> {
+        // value: T
+        // prev: usize
+        // next: usize
+        // }
+
+        // sizeof: GhostCell<Node<T>> = max(usize, T) + usize + usize
+        // 272 = 256 + 8 + 8
+
+        panic!("{}", std::mem::size_of::<GhostCell<'_, Node<Big>>>());
     }
 }
