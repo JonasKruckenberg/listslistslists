@@ -1,5 +1,5 @@
 [workspace]
-members = ["lists/*"]
+members = ["lists/*", "benchmarks"]
 
 [profile.release]
 codegen-units = 1
