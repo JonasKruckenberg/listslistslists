@@ -22,7 +22,7 @@ use slotmap::{DefaultKey, SlotMap};
 
 pub struct LinkedList<T> {
     len: usize,
-    nodes: SlotMap<DefaultKey, Node<T>>,
+    arena: SlotMap<DefaultKey, Node<T>>,
     head_tail: Option<(DefaultKey, DefaultKey)>,
 }
 
@@ -30,7 +30,7 @@ impl<T> LinkedList<T> {
     pub fn new() -> Self {
         Self {
             head_tail: None,
-            nodes: SlotMap::new(),
+            arena: SlotMap::new(),
             len: 0,
         }
     }
@@ -38,7 +38,7 @@ impl<T> LinkedList<T> {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             head_tail: None,
-            nodes: SlotMap::with_capacity(capacity),
+            arena: SlotMap::with_capacity(capacity),
             len: 0,
         }
     }
@@ -107,7 +107,7 @@ impl<T> LinkedList<T> {
 
         if head == tail {
             // they are pointing to the same thing, but let's keep the symmetry
-            Some(self.remove(tail).unwrap().value);
+            return Some(self.remove(tail).unwrap().value);
         }
 
         let new_tail = self.get_mut(head).unwrap().prev.take().unwrap();
@@ -124,7 +124,7 @@ impl<T> LinkedList<T> {
     }
 
     fn insert(&mut self, value: T) -> DefaultKey {
-        self.nodes.insert(Node {
+        self.arena.insert(Node {
             value,
             prev: None,
             next: None,
@@ -132,15 +132,15 @@ impl<T> LinkedList<T> {
     }
 
     fn get_mut(&mut self, node_ref: DefaultKey) -> Option<&mut Node<T>> {
-        self.nodes.get_mut(node_ref)
+        self.arena.get_mut(node_ref)
     }
 
     fn get(&self, node_ref: DefaultKey) -> Option<&Node<T>> {
-        self.nodes.get(node_ref)
+        self.arena.get(node_ref)
     }
 
     fn remove(&mut self, node_ref: DefaultKey) -> Option<Node<T>> {
-        self.nodes.remove(node_ref)
+        self.arena.remove(node_ref)
     }
 }
 

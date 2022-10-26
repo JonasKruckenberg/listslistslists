@@ -9,10 +9,14 @@ edition = "2021"
 first = { path = "../lists/first" }
 second = { path = "../lists/second" }
 third = { path = "../lists/third" }
+fourth = { path = "../lists/fourth" }
+fifth = { path = "../lists/fifth" }
+sixth = { path = "../lists/sixth" }
 ghost-cell = "0.2.2"
+typed-arena = "2.0.1"
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = { version = "0.3", features = ["html_reports"] }
 
 [[bench]]
 name = "benches"

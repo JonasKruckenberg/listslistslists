@@ -1,6 +1,7 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use ghost_cell::GhostToken;
 use std::collections::VecDeque;
+use typed_arena::Arena;
 
 #[derive(Default)]
 struct Big([usize; 32]);
@@ -31,6 +32,38 @@ fn push_back_third_big(n: usize) {
     for _ in 0..n {
         list.push_back(Big::default());
     }
+}
+
+fn push_back_fourth_big(n: usize) {
+    GhostToken::new(|ref mut token| {
+        let arena = Arena::with_capacity(n);
+        let mut list = fourth::LinkedList::new(&arena);
+
+        for _ in 0..n {
+            list.push_back(Big::default(), token);
+        }
+    });
+}
+
+fn push_back_fifth_big(n: usize) {
+    GhostToken::new(|ref mut token| {
+        let arena = Arena::with_capacity(n);
+        let mut list = fifth::LinkedList::new(&arena);
+
+        for _ in 0..n {
+            list.push_back(Big::default(), token);
+        }
+    });
+}
+
+fn push_back_sixth_big(n: usize) {
+    GhostToken::new(|ref mut token| {
+        let list = sixth::LinkedList::with_capacity(n);
+
+        for _ in 0..n {
+            list.push_back(Big::default(), token);
+        }
+    });
 }
 
 fn push_back_std_big(n: usize) {
@@ -67,6 +100,24 @@ fn criterion_benchmark(c: &mut Criterion) {
         group
             .bench_with_input(BenchmarkId::new("third", i), i, |b, i| {
                 b.iter(|| push_back_third_big(*i))
+            })
+            .throughput(Throughput::Elements(*i as u64));
+
+        group
+            .bench_with_input(BenchmarkId::new("fourth", i), i, |b, i| {
+                b.iter(|| push_back_fourth_big(*i))
+            })
+            .throughput(Throughput::Elements(*i as u64));
+
+        group
+            .bench_with_input(BenchmarkId::new("fifth", i), i, |b, i| {
+                b.iter(|| push_back_fifth_big(*i))
+            })
+            .throughput(Throughput::Elements(*i as u64));
+
+        group
+            .bench_with_input(BenchmarkId::new("sixth", i), i, |b, i| {
+                b.iter(|| push_back_sixth_big(*i))
             })
             .throughput(Throughput::Elements(*i as u64));
 

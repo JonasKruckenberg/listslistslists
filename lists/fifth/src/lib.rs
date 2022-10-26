@@ -2,11 +2,12 @@
 #![forbid(unsafe_code)]
 
 use ghost_cell::{GhostCell, GhostToken};
+use static_rc::StaticRcRef;
 use typed_arena::Arena;
 
 pub struct LinkedList<'arena, 'id, T> {
     arena: &'arena Arena<Node<'arena, 'id, T>>,
-    head_tail: Option<(NodeRef<'arena, 'id, T>, NodeRef<'arena, 'id, T>)>,
+    head_tail: Option<(HalfNodePtr<'arena, 'id, T>, HalfNodePtr<'arena, 'id, T>)>,
 }
 
 impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
@@ -26,37 +27,39 @@ impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
     }
 
     pub fn iter<'a>(&'a self, token: &'a GhostToken<'id>) -> Iter<'a, 'arena, 'id, T> {
+        let head_tail = self.head_tail.as_ref().map(|head_tail| (&*head_tail.0, &*head_tail.1));
+
         Iter {
             token,
-            head_tail: self.head_tail,
+            head_tail,
         }
     }
 
     pub fn push_front(&mut self, value: T, token: &mut GhostToken<'id>) {
-        let new_head = self.insert(value);
+        let (one, two) = self.new_halves(value);
 
         let head_tail = if let Some((head, tail)) = self.head_tail.take() {
-            head.borrow_mut(token).prev = Some(new_head);
-            new_head.borrow_mut(token).next = Some(head);
+            head.borrow_mut(token).prev = Some(one);
+            two.borrow_mut(token).next = Some(head);
 
-            (new_head, tail)
+            (two, tail)
         } else {
-            (new_head, new_head)
+            (one, two)
         };
 
         self.head_tail = Some(head_tail)
     }
 
     pub fn push_back(&mut self, value: T, token: &mut GhostToken<'id>) {
-        let new_tail = self.insert(value);
+        let (one, two) = self.new_halves(value);
 
         let head_tail = if let Some((head, tail)) = self.head_tail.take() {
-            tail.borrow_mut(token).next = Some(new_tail);
-            new_tail.borrow_mut(token).prev = Some(tail);
+            tail.borrow_mut(token).next = Some(one);
+            two.borrow_mut(token).prev = Some(tail);
 
-            (head, new_tail)
+            (head, two)
         } else {
-            (new_tail, new_tail)
+            (one, two)
         };
 
         self.head_tail = Some(head_tail)
@@ -66,24 +69,24 @@ impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
         let (head, tail) = self.head_tail.take()?;
 
         // when there is only one element in the list
-        if head.as_ptr() == tail.as_ptr() {
-            return Some(Self::into_inner(head, token));
+        if StaticRcRef::as_ptr(&head) == StaticRcRef::as_ptr(&tail) {
+            return Some(Self::into_inner(head, tail, token));
         }
 
         let next = head.borrow_mut(token).next.take().unwrap();
-        let _other_head = next.borrow_mut(token).prev.take().unwrap();
+        let other_head = next.borrow_mut(token).prev.take().unwrap();
 
         self.head_tail = Some((next, tail));
 
-        Some(Self::into_inner(head, token))
+        Some(Self::into_inner(head, other_head, token))
     }
 
     pub fn pop_back(&mut self, token: &mut GhostToken<'id>) -> Option<T> {
         let (head, tail) = self.head_tail.take()?;
 
         // when there is only one element in the list
-        if head.as_ptr() == tail.as_ptr() {
-            return Some(Self::into_inner(head, token));
+        if StaticRcRef::as_ptr(&head) == StaticRcRef::as_ptr(&tail) {
+            return Some(Self::into_inner(head, tail, token));
         }
 
         let prev = tail
@@ -91,7 +94,7 @@ impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
             .prev
             .take()
             .expect("Non-head should have a left node");
-        let _other_tail = prev
+        let other_tail = prev
             .borrow_mut(token)
             .next
             .take()
@@ -99,26 +102,33 @@ impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
 
         self.head_tail = Some((head, prev));
 
-        Some(Self::into_inner(tail, token))
+        Some(Self::into_inner(tail, other_tail, token))
     }
 
     pub fn clear(&mut self, token: &mut GhostToken<'id>) {
         while self.pop_back(token).is_some() {}
     }
 
-    fn insert(&self, value: T) -> NodeRef<'arena, 'id, T> {
-        GhostCell::from_mut(self.arena.alloc(Node {
+    fn new_halves(&self, value: T) -> (HalfNodePtr<'arena, 'id, T>, HalfNodePtr<'arena, 'id, T>) {
+        let node = self.arena.alloc(Node {
             value: Some(value),
             prev: None,
             next: None,
-        }))
+        });
+
+        let full = FullNodePtr::new(GhostNode::from_mut(node));
+
+        StaticRcRef::split::<1, 1>(full)
     }
 
     fn into_inner(
-        node_ref: NodeRef<'arena, 'id, T>,
+        left: HalfNodePtr<'arena, 'id, T>,
+        right: HalfNodePtr<'arena, 'id, T>,
         token: &mut GhostToken<'id>,
     ) -> T {
-        let node = node_ref.borrow_mut(token);
+        let full = FullNodePtr::join(left, right);
+        let ghost_cell = FullNodePtr::into_inner(full);
+        let node = ghost_cell.borrow_mut(token);
 
         //  If the node still has a prev and next, they are leaked.
         debug_assert!(node.prev.is_none());
@@ -130,15 +140,18 @@ impl<'arena, 'id, T> LinkedList<'arena, 'id, T> {
 
 pub struct Node<'arena, 'id, T> {
     value: Option<T>,
-    prev: Option<NodeRef<'arena, 'id, T>>,
-    next: Option<NodeRef<'arena, 'id, T>>,
+    prev: Option<HalfNodePtr<'arena, 'id, T>>,
+    next: Option<HalfNodePtr<'arena, 'id, T>>,
 }
 
-type NodeRef<'arena, 'id, T> = &'arena GhostCell<'id, Node<'arena, 'id, T>>;
+type GhostNode<'arena, 'id, T> = GhostCell<'id, Node<'arena, 'id, T>>;
+
+type HalfNodePtr<'arena, 'id, T> = StaticRcRef<'arena, GhostNode<'arena, 'id, T>, 1, 2>;
+type FullNodePtr<'arena, 'id, T> = StaticRcRef<'arena, GhostNode<'arena, 'id, T>, 2, 2>;
 
 pub struct Iter<'a, 'arena, 'id, T> {
     token: &'a GhostToken<'id>,
-    head_tail: Option<(NodeRef<'arena, 'id, T>, NodeRef<'arena, 'id, T>)>,
+    head_tail: Option<(&'a GhostNode<'arena, 'id, T>, &'a GhostNode<'arena, 'id, T>)>,
 }
 
 impl<'a, 'arena, 'id, T> Iterator for Iter<'a, 'arena, 'id, T>
@@ -153,7 +166,7 @@ where
         let node = head.borrow(self.token);
 
         if head.as_ptr() != tail.as_ptr() {
-            self.head_tail = node.next.map(|n| (n, tail));
+            self.head_tail = node.next.as_ref().map(|n| (n.as_ref(), tail));
         } else {
             self.head_tail = None;
         }
@@ -172,7 +185,7 @@ where
         let node = tail.borrow(self.token);
 
         if head.as_ptr() != tail.as_ptr() {
-            self.head_tail = node.prev.map(|n| (head, n));
+            self.head_tail = node.prev.as_ref().map(|n| (head, n.as_ref()));
         } else {
             self.head_tail = None;
         }
