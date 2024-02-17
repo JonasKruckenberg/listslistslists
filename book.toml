@@ -1,0 +1,13 @@
+[book]
+authors = ["Jonas Kruckenberg"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Linked Lists"
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
+[output.html]
+additional-js = ["theme/mermaid.min.js", "theme/mermaid-init.js", "theme/ferris.js"]
+additional-css = ["theme/ferris.css"]

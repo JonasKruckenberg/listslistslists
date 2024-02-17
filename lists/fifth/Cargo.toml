@@ -1,0 +1,11 @@
+[package]
+name = "fifth"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ghost-cell = "0.2.2"
+typed-arena = { version = "2.0.1", default-features = false }
+static-rc = { version = "0.6.0", default-features = false, features = ["compile-time-ratio"] }
